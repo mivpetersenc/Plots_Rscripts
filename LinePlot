@@ -1,0 +1,100 @@
+library(ggplot2)
+library(readr)
+library(dplyr)
+
+# ---- USER SETTINGS ----
+file_path <- "LinePlot_RFItime.csv"  # Your CSV file path
+plot_title <- "Timecourse Plot"
+y_axis_title <- "Measured Value"
+x_axis_title <- "Time"
+y_axis_min <- 0
+y_axis_max <- 1.5
+
+# Font settings
+title_font_size <- 18
+axis_font_size <- 14
+legend_font_size <- 12
+font_family <- ""  # Set to "" for system default
+title_position <- 0.5  # 0 = left, 0.5 = center, 1 = right
+
+# Appearance
+line_size <- 1.2
+point_size <- 2.5
+use_custom_colors <- TRUE
+show_legend <- TRUE
+legend_title <- "Group"
+
+# Error bar settings
+show_errorbars <- TRUE  # TRUE = show SEM error bars
+show_individual_lines <- FALSE  # TRUE = lines per sample, FALSE = just group mean
+
+# Optional: custom colors for each group
+custom_colors <- c("Normal.B6" = "#1f77b4", "BTLA.KO" = "#ff7f0e",
+                   "PD-1.KO" = "#2ca02c", "CR.CD5" = "#d62728",
+                   "CR.CD96" = "#9467bd")
+
+# ---- LOAD DATA ----
+data <- read_csv(file_path)
+
+# Ensure correct ordering of time (factor)
+data$Time <- factor(data$Time, levels = c("Day0", "Day3", "Day7", "Day14"))
+
+# ---- SEM helper ----
+sem <- function(x) {
+  sd(x, na.rm = TRUE) / sqrt(length(na.omit(x)))
+}
+
+# ---- PLOT ----
+p <- ggplot(data, aes(x = Time, y = Value, color = Group))
+
+# Optional: show individual sample lines
+if (show_individual_lines) {
+  p <- p + geom_line(aes(group = SampleID), alpha = 0.4, size = 0.7)
+}
+
+# Group average lines and points
+p <- p + stat_summary(aes(group = Group), fun = mean, geom = "line",
+                      size = line_size, linetype = "solid") +
+  stat_summary(aes(group = Group), fun = mean, geom = "point",
+               size = point_size, shape = 21, fill = "white")
+
+# Error bars (mean ± SEM)
+if (show_errorbars) {
+  p <- p + stat_summary(
+    fun.data = function(x) {
+      m <- mean(x, na.rm = TRUE)
+      s <- sem(x)
+      data.frame(y = m, ymin = m - s, ymax = m + s)
+    },
+    geom = "errorbar",
+    width = 0.2,
+    size = 0.8
+  )
+}
+
+# Custom colors
+if (use_custom_colors) {
+  p <- p + scale_color_manual(values = custom_colors)
+}
+
+# Final formatting
+p <- p +
+  labs(
+    title = plot_title,
+    x = x_axis_title,
+    y = y_axis_title,
+    color = if (show_legend) legend_title else NULL
+  ) +
+  scale_y_continuous(limits = c(y_axis_min, y_axis_max)) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(size = title_font_size, hjust = title_position, family = font_family),
+    axis.title = element_text(size = axis_font_size, family = font_family),
+    axis.text = element_text(size = axis_font_size, family = font_family),
+    legend.title = element_text(size = legend_font_size, family = font_family),
+    legend.text = element_text(size = legend_font_size, family = font_family),
+    legend.position = if (show_legend) "right" else "none"
+  )
+
+# Show it
+print(p)
