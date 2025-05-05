@@ -11,8 +11,6 @@ library(ggpubr)
 file_path <- "RFI_marker_EX1.csv"      # Your CSV file path
 plot_title <- "My Plot"
 y_axis_title <- "Measurement"
-y_axis_min <- 0
-y_axis_max <- 1
 
 # FONT SETTINGS
 title_font_size <- 20
@@ -43,6 +41,11 @@ use_custom_shape <- TRUE
 data <- read_csv(file_path)
 data_long <- data %>%
   pivot_longer(cols = everything(), names_to = "Group", values_to = "Value")
+
+y_axis_min <- min(data) - 0.5
+y_axis_max <- max(data) + 0.5
+
+colnames(data)
 
 # Define color and shape per group
 custom_colors <- c("Normal.B6" = "#1f77b4", "BTLA.KO" = "#ff7f0e", "PD-1.KO" = "#2ca02c", 
@@ -127,7 +130,9 @@ p <- p +
     shape = if (show_legend) legend_title else NULL,
     fill = if (show_legend) legend_title else NULL
   ) +
-  scale_y_continuous(limits = c(y_axis_min, y_axis_max)) +
+  scale_y_continuous(limits = c(y_axis_min, y_axis_max)#,
+                     #breaks = seq(0, 2, by = 0.25)  # or any custom vector like c(0, 0.5, 1, 1.5)
+                     ) +
   theme_classic(base_size = 15) +
   theme(
     plot.title = element_text(size = title_font_size, family = font_family, hjust = title_position),
