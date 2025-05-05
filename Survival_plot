@@ -1,0 +1,89 @@
+# ---- LOAD LIBRARIES ----
+library(survival)     # For survival analysis and Surv() function
+library(survminer)    # For plotting survival curves
+library(readr)        # To load CSV files
+library(dplyr)        # For data manipulation (optional)
+library(scales)       # For formatting axes, e.g., percentages
+
+# ---- USER SETTINGS ----
+
+# File path to the input CSV file. Must contain columns: Time, Status, Group
+file_path <- "survival_example.csv"
+
+# ---- LOAD DATA ----
+
+# Load CSV with expected structure: Time (numeric), Status (0=censored, 1=event), Group (factor or string)
+data <- read_csv(file_path)
+
+# Check unique values in 'Group' column
+print(unique(data$Group))
+
+# Check levels of 'Group'
+print(levels(data$Group))
+
+# Ensure that 'Group' is a factor and has the correct levels
+data$Group <- factor(data$Group, levels = c("Treated", "Control"))
+print(levels(data$Group))
+
+#------ Plot titles and axis labels -----
+plot_title <- "Survival Curve"
+x_axis_title <- "Time (weeks)"
+y_axis_title <- "Survival (%)"
+
+# Font settings (you can specify a font like "Arial" or leave "" for default)
+font.main <- NULL
+
+# Customize the appearance of groups
+custom_colors <- c("TreatmentA" = "#1f77b4", "Control" = "#d62728") # " Example of other color = "#458B00",
+custom_linetypes <- c("TreatmentA" = "solid", "Control" = "dashed") # Or "dotted"
+
+# Font sizes
+title_font_size <- 16
+axis_font_size <- 14
+legend_font_size <- 12
+
+# ggplot2 theme to control background and layout
+background_theme <- theme_classic() # theme_dark()
+
+
+# ---- FIT SURVIVAL MODEL ----
+
+# Fit a Kaplan-Meier survival curve grouped by the "Group" column
+fit <- survfit(Surv(Time, Status) ~ Group, data = data)
+
+# ---- PLOT SURVIVAL CURVES ----
+
+# Use ggsurvplot to build the plot, with full customization
+plot <- ggsurvplot(
+  fit,
+  data = data,                     # Original data
+  title = plot_title,             # Plot title
+  xlab = x_axis_title,            # X-axis label
+  ylab = y_axis_title,            # Y-axis label
+  palette = custom_colors,        # Custom color palette by group
+  linetype = custom_linetypes,    # Custom line types by group
+  surv.median.line = "hv",        # Add horizontal & vertical lines at median survival
+  risk.table = TRUE,              # Show number at risk table below the plot
+  risk.table.fontsize = 3.5,      # Font size for risk table
+  legend.title = "Group",         # Title for the legend
+  legend.labs = names(custom_colors),  # Labels for each group
+  ggtheme = background_theme,     # Background theme
+  font.x = c(axis_font_size, "plain"),      # X-axis font
+  font.y = c(axis_font_size, "plain"),      # Y-axis font
+  font.tickslab = c(axis_font_size, "plain"),  # Axis tick labels
+  font.legend = c(legend_font_size, "plain"),  # Legend font
+  linetype.custom = custom_linetypes   # Use your custom line types
+)
+
+# ---- FORMAT Y-AXIS AS PERCENTAGES ----
+
+# Convert survival from proportion (0–1) to percentage (0–100)
+plot$plot <- plot$plot +
+  scale_y_continuous(labels = percent_format(accuracy = 1))  # e.g., 0.5 → 50%
+
+# Optional: clean up the appearance of the risk table (e.g., hide y-axis text)
+plot$table <- plot$table +
+  theme(axis.text.y = element_blank())
+
+# ---- SHOW FINAL PLOT ----
+print(plot)
