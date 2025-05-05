@@ -1,0 +1,85 @@
+library(dplyr) # For data manipulation (e.g., grouping, filtering).
+library(rstatix)  # for pairwise_* functions with p adjustment
+
+run_statistical_test <- function(data_long, p_adjust_method = "holm") {
+  #data_long: A long-format data frame with at least two columns: Group (a factor or character indicating sample group) and Value (numeric).
+  #p_adjust_method: Optional. Specifies the method for multiple testing correction in pairwise comparisons (e.g., "holm", "bonferroni", "fdr").
+  
+  # Check input format
+  if (!("Group" %in% names(data_long)) || !("Value" %in% names(data_long))) {
+    stop("Input must have 'Group' and 'Value' columns.")
+  }
+  
+  groups <- unique(data_long$Group)
+  n_groups <- length(groups) # Identifies the different experimental groups and counts them. This determines whether to run a 2-group test or a multi-group test (ANOVA or Kruskal-Wallis).
+  
+  
+  
+  # Step 1: Shapiro-Wilk test per group
+  normality <- data_long %>%
+    group_by(Group) %>%
+    summarise(p_value = shapiro.test(Value)$p.value, .groups = "drop") %>%
+    mutate(normal = p_value > 0.05)
+  
+  all_normal <- all(normality$normal)
+  
+  # Step 2: Global test
+  if (n_groups == 2) {
+    # Extract vectors
+    g1 <- data_long %>% filter(Group == groups[1]) %>% pull(Value)
+    g2 <- data_long %>% filter(Group == groups[2]) %>% pull(Value)
+    
+    if (all_normal) {
+      test_result <- t.test(g1, g2)
+      test_name <- "T test"
+      pairwise_result <- data.frame()  # not needed
+    } else {
+      test_result <- wilcox.test(g1, g2)
+      test_name <- "Wilcoxon (Mann-Whitney) test"
+      pairwise_result <- data.frame()
+    }
+    
+  } else if (n_groups > 2) {
+    if (all_normal) {
+      test_result <- aov(Value ~ Group, data = data_long)
+      test_name <- "ANOVA"
+      pairwise_result <- data_long %>%
+        pairwise_t_test(Value ~ Group, p.adjust.method = p_adjust_method)
+    } else {
+      test_result <- kruskal.test(Value ~ Group, data = data_long)
+      test_name <- "Kruskal-Wallis test"
+      pairwise_result <- data_long %>%
+        pairwise_wilcox_test(Value ~ Group, p.adjust.method = p_adjust_method)
+    }
+  } else {
+    stop("Need at least two groups for comparison.")
+  }
+  
+  list(
+    normality_summary = normality,
+    test_name = test_name,
+    global_test = test_result,
+    pairwise_tests = pairwise_result
+  )
+}
+
+
+data <- read.csv("RFI_marker_EX1.csv") #Load your csv file
+
+data_long <- data %>%
+  pivot_longer(cols = everything(), names_to = "Group", values_to = "Value")
+
+result <- run_statistical_test(data_long)
+
+# Summary of normality per group
+print(result$normality_summary)
+
+# Global test
+cat("Global test used:", result$test_name, "\n")
+print(result$global_test)
+
+# Pairwise comparisons (if applicable)
+if (nrow(result$pairwise_tests) > 0) {
+  cat("\nPairwise comparisons:\n")
+  print(result$pairwise_tests)
+}
