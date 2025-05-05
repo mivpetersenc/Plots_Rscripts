@@ -1,0 +1,142 @@
+# Install if needed
+# install.packages(c("ggplot2", "dplyr", "tidyr", "readr", "ggbeeswarm"))
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+library(ggpubr)
+
+# ---- USER SETTINGS ----
+file_path <- "RFI_marker_EX1.csv"      # Your CSV file path
+plot_title <- "My Plot"
+y_axis_title <- "Measurement"
+y_axis_min <- 0
+y_axis_max <- 1
+
+# FONT SETTINGS
+title_font_size <- 20
+axis_font_size <- 16
+font_family <- ""                 # Leave "" for system default
+title_position <- 0.5             # 0 = left, 0.5 = center, 1 = right
+
+# LEGEND SETTINGS
+show_legend <- TRUE
+legend_title <- "Group"
+legend_font_size <- 14
+
+# STATISTIC OPTIONS
+use_mean <- TRUE                  # TRUE = mean, FALSE = median
+use_sem <- TRUE                   # TRUE = SEM, FALSE = SD
+show_errorbars <- TRUE            # TRUE = show error bars, FALSE = hide
+
+# PLOT STYLE OPTIONS
+use_dotplot <- TRUE               # Dot plot
+use_barplot <- FALSE              # Bar plot
+add_boxplot <- FALSE               # Add boxplot (only overlays dots)
+
+# COLOR AND SHAPE OPTIONS
+use_custom_color <- TRUE
+use_custom_shape <- TRUE
+
+# Define color and shape per group
+custom_colors <- c("Normal.B6" = "#1f77b4", "BTLA.KO" = "#ff7f0e", "PD-1.KO" = "#2ca02c", 
+                   "CR.CD5" = "#d62728", "CR.CD96" = "#9467bd")
+custom_shapes <- c("Normal.B6" = 16, "BTLA.KO" = 17, "PD-1.KO" = 18, 
+                   "CR.CD5" = 15, "CR.CD96" = 8)
+
+# SEM helper
+sem <- function(x) {
+  sd(x, na.rm = TRUE) / sqrt(length(na.omit(x)))
+}
+
+# Read and prepare data
+data <- read_csv(file_path)
+data_long <- data %>%
+  pivot_longer(cols = everything(), names_to = "Group", values_to = "Value")
+
+summary_data <- data_long %>%
+  group_by(Group) %>%
+  summarise(
+    Center = if (use_mean) mean(Value, na.rm = TRUE) else median(Value, na.rm = TRUE),
+    Error = if (use_sem) sem(Value) else sd(Value, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Ensure Group is a factor to control order
+if (!is.factor(data_long$Group)) {
+  data_long$Group <- factor(data_long$Group, levels = unique(data_long$Group))
+  summary_data$Group <- factor(summary_data$Group, levels = levels(data_long$Group))
+}
+
+# Base ggplot
+p <- ggplot(data_long, aes(x = Group, y = Value))
+
+# Dot plot
+if (use_dotplot) {
+  p <- p + geom_point(aes(color = if (use_custom_color) Group else NULL,
+                          shape = if (use_custom_shape) Group else NULL),
+                      position = position_jitter(width = 0.15), size = 2, alpha = 0.8)
+}
+
+# Bar plot
+if (use_barplot) {
+  p <- p + geom_bar(data = summary_data,
+                    aes(x = Group, y = Center,
+                        fill = if (use_custom_color) Group else NULL),
+                    stat = "identity", width = 0.6, color = "black")
+}
+
+# Boxplot
+if (add_boxplot) {
+  p <- p + geom_boxplot(aes(color = if (use_custom_color) Group else NULL),
+                        width = 0.4, fill = NA, outlier.shape = NA)
+}
+
+# Error bars
+if (show_errorbars) {
+  p <- p + geom_errorbar(data = summary_data,
+                         aes(x = Group, y = Center,
+                             ymin = Center - Error, ymax = Center + Error),
+                         width = 0.2, color = "black", size = 1, inherit.aes = FALSE)
+}
+
+# Summary points
+if (use_dotplot | add_boxplot) {
+  p <- p + geom_point(data = summary_data,
+                      aes(x = Group, y = Center),
+                      color = "red", size = 3, inherit.aes = FALSE)
+}
+
+# Apply custom color and shape scales
+if (use_custom_color) {
+  p <- p + scale_color_manual(values = custom_colors) +
+    scale_fill_manual(values = custom_colors)
+}
+if (use_custom_shape) {
+  p <- p + scale_shape_manual(values = custom_shapes)
+}
+
+# Final plot formatting
+p <- p +
+  labs(
+    title = plot_title,
+    x = "",
+    y = y_axis_title,
+    color = if (show_legend) legend_title else NULL,
+    shape = if (show_legend) legend_title else NULL,
+    fill = if (show_legend) legend_title else NULL
+  ) +
+  scale_y_continuous(limits = c(y_axis_min, y_axis_max)) +
+  theme_minimal(base_size = 15) +
+  theme(
+    plot.title = element_text(size = title_font_size, family = font_family, hjust = title_position),
+    axis.title.y = element_text(size = axis_font_size, family = font_family),
+    axis.text = element_text(size = axis_font_size, family = font_family),
+    legend.title = element_text(size = legend_font_size, family = font_family),
+    legend.text = element_text(size = legend_font_size, family = font_family),
+    legend.position = if (show_legend) "right" else "none"
+  )
+
+# Show plot
+print(p)
