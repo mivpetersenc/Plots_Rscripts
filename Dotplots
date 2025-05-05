@@ -16,14 +16,14 @@ y_axis_max <- 1
 
 # FONT SETTINGS
 title_font_size <- 20
-axis_font_size <- 16
+axis_font_size <- 14
 font_family <- ""                 # Leave "" for system default
 title_position <- 0.5             # 0 = left, 0.5 = center, 1 = right
 
 # LEGEND SETTINGS
 show_legend <- TRUE
 legend_title <- "Group"
-legend_font_size <- 14
+legend_font_size <- 12
 
 # STATISTIC OPTIONS
 use_mean <- TRUE                  # TRUE = mean, FALSE = median
@@ -39,6 +39,11 @@ add_boxplot <- FALSE               # Add boxplot (only overlays dots)
 use_custom_color <- TRUE
 use_custom_shape <- TRUE
 
+# Read and prepare data
+data <- read_csv(file_path)
+data_long <- data %>%
+  pivot_longer(cols = everything(), names_to = "Group", values_to = "Value")
+
 # Define color and shape per group
 custom_colors <- c("Normal.B6" = "#1f77b4", "BTLA.KO" = "#ff7f0e", "PD-1.KO" = "#2ca02c", 
                    "CR.CD5" = "#d62728", "CR.CD96" = "#9467bd")
@@ -49,11 +54,6 @@ custom_shapes <- c("Normal.B6" = 16, "BTLA.KO" = 17, "PD-1.KO" = 18,
 sem <- function(x) {
   sd(x, na.rm = TRUE) / sqrt(length(na.omit(x)))
 }
-
-# Read and prepare data
-data <- read_csv(file_path)
-data_long <- data %>%
-  pivot_longer(cols = everything(), names_to = "Group", values_to = "Value")
 
 summary_data <- data_long %>%
   group_by(Group) %>%
@@ -76,7 +76,7 @@ p <- ggplot(data_long, aes(x = Group, y = Value))
 if (use_dotplot) {
   p <- p + geom_point(aes(color = if (use_custom_color) Group else NULL,
                           shape = if (use_custom_shape) Group else NULL),
-                      position = position_jitter(width = 0.15), size = 2, alpha = 0.8)
+                      position = position_jitter(width = 0.1), size = 2, alpha = 0.8)
 }
 
 # Bar plot
@@ -98,14 +98,14 @@ if (show_errorbars) {
   p <- p + geom_errorbar(data = summary_data,
                          aes(x = Group, y = Center,
                              ymin = Center - Error, ymax = Center + Error),
-                         width = 0.2, color = "black", size = 1, inherit.aes = FALSE)
+                         width = 0.2, color = "black", size = 0.5, inherit.aes = FALSE)
 }
 
 # Summary points
 if (use_dotplot | add_boxplot) {
   p <- p + geom_point(data = summary_data,
                       aes(x = Group, y = Center),
-                      color = "red", size = 3, inherit.aes = FALSE)
+                      color = "black", size = 1, inherit.aes = FALSE)
 }
 
 # Apply custom color and shape scales
@@ -128,11 +128,12 @@ p <- p +
     fill = if (show_legend) legend_title else NULL
   ) +
   scale_y_continuous(limits = c(y_axis_min, y_axis_max)) +
-  theme_minimal(base_size = 15) +
+  theme_classic(base_size = 15) +
   theme(
     plot.title = element_text(size = title_font_size, family = font_family, hjust = title_position),
     axis.title.y = element_text(size = axis_font_size, family = font_family),
     axis.text = element_text(size = axis_font_size, family = font_family),
+    axis.text.x = element_text(angle = 45, hjust = 1),                   # <<<< To modify x-axis text
     legend.title = element_text(size = legend_font_size, family = font_family),
     legend.text = element_text(size = legend_font_size, family = font_family),
     legend.position = if (show_legend) "right" else "none"
@@ -140,3 +141,6 @@ p <- p +
 
 # Show plot
 print(p)
+
+# Export plot
+ggsave("Perc_FoxP3_LiveLymph.png", plot = p, width = 8, height = 6, dpi = 300)
