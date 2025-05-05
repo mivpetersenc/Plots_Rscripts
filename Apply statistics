@@ -83,3 +83,22 @@ if (nrow(result$pairwise_tests) > 0) {
   cat("\nPairwise comparisons:\n")
   print(result$pairwise_tests)
 }
+
+
+
+#--- To compare survival curves statistically using the log-rank test ------------
+library(survival)
+library(survminer)
+
+df <- read.csv("survival_example2.csv")
+
+# Fit the survival curves
+surv_obj <- Surv(time = as.numeric(df$Time), event = as.numeric(df$Status))
+fit <- survfit(surv_obj ~ Group, data = df)
+
+# Compare groups
+survdiff(Surv(Time, Status) ~ Group, data = df) # A chi-squared statistic. A global p-value testing if at least one survival curve differs.
+# To find which groups differ, use pairwise log-rank tests with multiple testing correction
+
+pairwise_survdiff(Surv(Time, Status) ~ Group, data = df, p.adjust.method = "holm") # you can use "holm", "bonferroni", "fdr", etc.
+
